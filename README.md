@@ -4,7 +4,13 @@ Tracks stock tickers mentioned on [r/wallstreetbets](https://www.reddit.com/r/wa
 
 ![web interface](./docs/images/web-local-interface.png)
 ![detail page](./docs/images/web-local-interface-posts-details.png)
-![reddit link](./docs/images/reddit-link.png)
+
+<details>
+<summary>Reddit link preview</summary>
+
+<img src="./docs/images/reddit-link.png" alt="reddit link" width="400">
+
+</details>
 
 ## How it works
 
