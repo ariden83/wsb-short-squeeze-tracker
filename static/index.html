@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WSB Short Squeeze Tracker</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #0d1117;
+      color: #e6edf3;
+      min-height: 100vh;
+      padding: 2rem 1rem;
+    }
+
+    header {
+      max-width: 760px;
+      margin: 0 auto 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    h1 {
+      font-size: 1.4rem;
+      font-weight: 600;
+      color: #ff6b35;
+      letter-spacing: .02em;
+    }
+
+
+    .controls {
+      max-width: 760px;
+      margin: 0 auto 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .last-updated {
+      font-size: .8rem;
+      color: #8b949e;
+    }
+
+    button {
+      background: #21262d;
+      color: #e6edf3;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      padding: .4rem .9rem;
+      font-size: .82rem;
+      cursor: pointer;
+      transition: background .15s, border-color .15s;
+    }
+    button:hover { background: #30363d; border-color: #8b949e; }
+    button:active { background: #161b22; }
+    button:disabled { opacity: .4; cursor: default; }
+
+    .table-wrap {
+      max-width: 760px;
+      margin: 0 auto;
+      border: 1px solid #21262d;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    thead {
+      background: #161b22;
+    }
+
+    thead th {
+      padding: .75rem 1.25rem;
+      text-align: left;
+      font-size: .75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      color: #8b949e;
+    }
+
+    tbody tr {
+      border-top: 1px solid #21262d;
+      transition: background .1s;
+    }
+    tbody tr:hover { background: #161b22; }
+
+    td {
+      padding: .75rem 1.25rem;
+      font-size: .9rem;
+    }
+
+    .rank {
+      color: #8b949e;
+      font-size: .78rem;
+      width: 2rem;
+    }
+
+    .ticker-cell {
+      font-weight: 700;
+      font-size: 1rem;
+      letter-spacing: .04em;
+    }
+    .ticker-cell a {
+      color: #79c0ff;
+      text-decoration: none;
+    }
+    .ticker-cell a:hover {
+      color: #a5d6ff;
+      text-decoration: underline;
+    }
+
+    .count-cell {
+      font-variant-numeric: tabular-nums;
+    }
+
+    .bar-wrap {
+      display: flex;
+      align-items: center;
+      gap: .75rem;
+    }
+
+    .bar-bg {
+      flex: 1;
+      height: 6px;
+      background: #21262d;
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #ff6b35, #ff9f1c);
+      border-radius: 3px;
+      transition: width .4s ease;
+    }
+
+    .time-cell {
+      color: #8b949e;
+      font-size: .82rem;
+      white-space: nowrap;
+    }
+
+    .empty {
+      max-width: 760px;
+      margin: 3rem auto;
+      text-align: center;
+      color: #8b949e;
+      font-size: .95rem;
+    }
+
+    .spinner {
+      display: inline-block;
+      width: 1.2rem;
+      height: 1.2rem;
+      border: 2px solid #30363d;
+      border-top-color: #ff6b35;
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+      vertical-align: middle;
+      margin-right: .5rem;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Detail drawer ── */
+    .drawer-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.55);
+      z-index: 100;
+    }
+    .drawer-overlay.open { display: block; }
+
+    .drawer {
+      position: fixed;
+      top: 0; right: 0;
+      width: min(480px, 100vw);
+      height: 100vh;
+      background: #161b22;
+      border-left: 1px solid #30363d;
+      display: flex;
+      flex-direction: column;
+      transform: translateX(100%);
+      transition: transform .25s ease;
+      z-index: 101;
+    }
+    .drawer.open { transform: translateX(0); }
+
+    .drawer-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1.25rem 1.5rem;
+      border-bottom: 1px solid #30363d;
+      gap: 1rem;
+    }
+    .drawer-title {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: #79c0ff;
+      letter-spacing: .05em;
+    }
+    .drawer-close {
+      background: none;
+      border: none;
+      color: #8b949e;
+      font-size: 1.4rem;
+      cursor: pointer;
+      line-height: 1;
+      padding: .2rem .4rem;
+      border-radius: 4px;
+    }
+    .drawer-close:hover { background: #21262d; color: #e6edf3; }
+
+    .drawer-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 1rem 1.5rem;
+    }
+
+    .post-item {
+      padding: .9rem 0;
+      border-bottom: 1px solid #21262d;
+    }
+    .post-item:last-child { border-bottom: none; }
+
+    .post-title {
+      font-size: .9rem;
+      line-height: 1.45;
+      margin-bottom: .35rem;
+    }
+    .post-title a {
+      color: #e6edf3;
+      text-decoration: none;
+    }
+    .post-title a:hover { color: #79c0ff; text-decoration: underline; }
+
+    .post-meta {
+      display: flex;
+      align-items: center;
+      gap: .6rem;
+      font-size: .75rem;
+      color: #8b949e;
+    }
+    .squeeze-badge {
+      background: #2d1f0e;
+      color: #ff9f1c;
+      border: 1px solid #ff9f1c44;
+      border-radius: 4px;
+      padding: .1rem .45rem;
+      font-size: .7rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+    }
+
+    .sentiment {
+      display: inline-flex;
+      align-items: center;
+      gap: .25rem;
+      border-radius: 4px;
+      padding: .1rem .45rem;
+      font-size: .7rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+    }
+    .sentiment.bullish { background:#0d2818; color:#3fb950; border:1px solid #3fb95044; }
+    .sentiment.bearish { background:#2d0e0e; color:#f85149; border:1px solid #f8514944; }
+    .sentiment.neutral { background:#1c1c1c; color:#8b949e; border:1px solid #8b949e44; }
+
+    .post-translation {
+      font-size: .82rem;
+      color: #8b949e;
+      margin-bottom: .3rem;
+      font-style: italic;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>WSB Short Squeeze Tracker</h1>
+</header>
+
+<div class="controls">
+  <span class="last-updated" id="last-updated">–</span>
+  <button id="refresh-btn" onclick="load()">Refresh</button>
+  <button id="run-btn" onclick="triggerJob()">Run job now</button>
+  <button id="reset-btn" onclick="resetCache()" style="color:#f85149;border-color:#f85149">Clear cache</button>
+</div>
+
+<div id="content"></div>
+
+<!-- Detail drawer -->
+<div class="drawer-overlay" id="overlay" onclick="closeDrawer()"></div>
+<div class="drawer" id="drawer">
+  <div class="drawer-header">
+    <span class="drawer-title" id="drawer-title">$TICKER</span>
+    <button class="drawer-close" onclick="closeDrawer()">&#x2715;</button>
+  </div>
+  <div class="drawer-body" id="drawer-body">
+    <div class="empty"><span class="spinner"></span>Loading…</div>
+  </div>
+</div>
+
+<script>
+  function relativeTime(isoStr) {
+    const diff = (Date.now() - new Date(isoStr)) / 1000;
+    if (diff < 60)    return `${Math.floor(diff)}s ago`;
+    if (diff < 3600)  return `${Math.floor(diff/60)}m ago`;
+    if (diff < 86400) return `${Math.floor(diff/3600)}h ago`;
+    return `${Math.floor(diff/86400)}d ago`;
+  }
+
+
+  async function load() {
+    const btn = document.getElementById('refresh-btn');
+    btn.disabled = true;
+    const content = document.getElementById('content');
+    content.innerHTML = '<div class="empty"><span class="spinner"></span>Loading…</div>';
+
+    try {
+      const r = await fetch('/api/tickers');
+      const data = await r.json();
+
+      document.getElementById('last-updated').textContent =
+        'Updated ' + new Date().toLocaleTimeString();
+
+      if (!data || data.length === 0) {
+        content.innerHTML = '<div class="empty">No mentions found yet. Run the job to fetch data.</div>';
+        return;
+      }
+
+      const maxCount = data[0].count;
+
+      const rows = data.map((item, i) => `
+        <tr>
+          <td class="rank">${i + 1}</td>
+          <td class="ticker-cell">
+            <a href="#" onclick="openDrawer('${item.ticker}');return false;"
+               title="Voir les posts Reddit pour $${item.ticker}">$${item.ticker}</a>
+          </td>
+          <td class="count-cell">
+            <div class="bar-wrap">
+              <div class="bar-bg">
+                <div class="bar-fill" style="width:${Math.round(item.count/maxCount*100)}%"></div>
+              </div>
+              <span>${item.count}</span>
+            </div>
+          </td>
+          <td class="time-cell">${relativeTime(item.last_seen)}</td>
+        </tr>
+      `).join('');
+
+      content.innerHTML = `
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Ticker</th>
+                <th>Mentions (30d)</th>
+                <th>Last seen</th>
+              </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>
+      `;
+    } catch (e) {
+      content.innerHTML = '<div class="empty">Error loading data.</div>';
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  async function triggerJob() {
+    const btn = document.getElementById('run-btn');
+    btn.disabled = true;
+    btn.textContent = 'Running…';
+    try {
+      await fetch('/api/run', { method: 'POST' });
+      btn.textContent = 'Job triggered';
+      setTimeout(() => { btn.textContent = 'Run job now'; btn.disabled = false; }, 3000);
+      setTimeout(load, 5000);
+    } catch {
+      btn.textContent = 'Error';
+      setTimeout(() => { btn.textContent = 'Run job now'; btn.disabled = false; }, 2000);
+    }
+  }
+
+  async function resetCache() {
+    if (!confirm('Vider le cache et les données ? Le prochain job re-fetchera tout depuis le début.')) return;
+    const btn = document.getElementById('reset-btn');
+    btn.disabled = true;
+    btn.textContent = 'Clearing…';
+    try {
+      await fetch('/api/reset', { method: 'POST' });
+      btn.textContent = 'Cleared';
+      setTimeout(() => { btn.textContent = 'Clear cache'; btn.disabled = false; }, 2000);
+      load();
+    } catch {
+      btn.textContent = 'Error';
+      setTimeout(() => { btn.textContent = 'Clear cache'; btn.disabled = false; }, 2000);
+    }
+  }
+
+  async function openDrawer(ticker) {
+    document.getElementById('drawer-title').textContent = '$' + ticker;
+    document.getElementById('drawer-body').innerHTML =
+      '<div class="empty"><span class="spinner"></span>Loading…</div>';
+    document.getElementById('overlay').classList.add('open');
+    document.getElementById('drawer').classList.add('open');
+    document.body.style.overflow = 'hidden';
+
+    try {
+      const r = await fetch('/api/tickers/' + ticker);
+      const posts = await r.json();
+
+      if (!posts || posts.length === 0) {
+        document.getElementById('drawer-body').innerHTML =
+          '<div class="empty">Aucun post trouvé pour ce ticker.</div>';
+        return;
+      }
+
+      const sentimentLabel = { bullish: '↑ Haussier', bearish: '↓ Baissier', neutral: '— Neutre' };
+
+      document.getElementById('drawer-body').innerHTML = posts.map(p => `
+        <div class="post-item">
+          <div class="post-title">
+            <a href="${p.url}" target="_blank" rel="noopener">${escHtml(p.title)}</a>
+          </div>
+          ${p.translation ? `<div class="post-translation">${escHtml(p.translation)}</div>` : ''}
+          <div class="post-meta">
+            ${p.sentiment ? `<span class="sentiment ${p.sentiment}">${sentimentLabel[p.sentiment] || p.sentiment}</span>` : ''}
+            ${p.squeeze_hit ? '<span class="squeeze-badge">🔥 squeeze</span>' : ''}
+            <span>${relativeTime(p.seen_at)}</span>
+            <a href="${p.url}" target="_blank" rel="noopener"
+               style="color:#8b949e;font-size:.72rem">r/wallstreetbets ↗</a>
+          </div>
+        </div>
+      `).join('');
+    } catch {
+      document.getElementById('drawer-body').innerHTML =
+        '<div class="empty">Erreur lors du chargement.</div>';
+    }
+  }
+
+  function closeDrawer() {
+    document.getElementById('overlay').classList.remove('open');
+    document.getElementById('drawer').classList.remove('open');
+    document.body.style.overflow = '';
+  }
+
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDrawer(); });
+
+  function escHtml(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  // Auto-refresh every 5 minutes
+  setInterval(load, 5 * 60 * 1000);
+  load();
+</script>
+</body>
+</html>

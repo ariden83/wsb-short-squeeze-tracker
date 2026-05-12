@@ -1,0 +1,2 @@
+argostranslate>=1.9.0
+vaderSentiment>=3.3.2

@@ -1,0 +1,234 @@
+<!doctype html>
+<html dir="ltr" lang="fr">
+<head>
+    <meta charset="utf-8">
+    <title>WSB - Squeeze posts</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            background: #dae0e6;
+            color: #1c1c1c;
+            min-height: 100vh;
+        }
+
+        header {
+            background: #ff4500;
+            color: white;
+            padding: 14px 24px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        header h1 {
+            font-size: 1.1em;
+            font-weight: 700;
+        }
+
+        header .sub { font-size: 0.85em; opacity: 0.85; }
+
+        #container {
+            max-width: 860px;
+            margin: 20px auto;
+            padding: 0 16px;
+        }
+
+        #status {
+            padding: 12px 16px;
+            background: white;
+            border-radius: 4px;
+            margin-bottom: 16px;
+            font-size: 0.9em;
+            color: #555;
+        }
+
+        #status.error { color: #c0392b; }
+
+        .post {
+            background: white;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            padding: 12px 16px;
+            border-left: 4px solid transparent;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .post.has-squeeze { border-left-color: #ff4500; }
+
+        .post-meta {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            font-size: 0.78em;
+            color: #888;
+        }
+
+        .post-score {
+            font-weight: 700;
+            color: #ff4500;
+        }
+
+        .post-flair {
+            background: #f0f0f0;
+            padding: 2px 7px;
+            border-radius: 12px;
+            font-size: 0.78em;
+            color: #555;
+        }
+
+        .post-title {
+            font-size: 1em;
+            font-weight: 600;
+            line-height: 1.35;
+        }
+
+        .post-title a {
+            color: #1c1c1c;
+            text-decoration: none;
+        }
+
+        .post-title a:hover { color: #ff4500; }
+
+        .post-excerpt {
+            font-size: 0.85em;
+            color: #555;
+            line-height: 1.45;
+            overflow: hidden;
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+        }
+
+        .squeeze-badge {
+            display: inline-block;
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffc107;
+            padding: 1px 7px;
+            border-radius: 10px;
+            font-size: 0.72em;
+            font-weight: 700;
+            letter-spacing: 0.03em;
+            vertical-align: middle;
+            margin-left: 6px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #888;
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <div>
+        <h1 id="header-title">r/wallstreetbets</h1>
+        <div class="sub" id="header-sub">Chargement...</div>
+    </div>
+</header>
+
+<div id="container">
+    <div id="status">Chargement des posts...</div>
+    <div id="posts"></div>
+</div>
+
+<script>
+    const params = new URLSearchParams(window.location.search);
+    const ticker = (params.get('ticker') || '').toUpperCase();
+
+    document.getElementById('header-title').textContent = `r/wallstreetbets — ${ticker} squeeze`;
+    document.title = `WSB ${ticker} squeeze`;
+
+    function extractTicker(filename) {
+        const clean = filename.replace('5m_', '').replace('.json', '');
+        const match = clean.match(/^(.*?)-\d{4}-/);
+        return match ? match[1].toUpperCase() : clean.toUpperCase();
+    }
+
+    function relativeTime(utc) {
+        const diff = Math.floor(Date.now() / 1000) - utc;
+        if (diff < 3600) return `il y a ${Math.floor(diff / 60)} min`;
+        if (diff < 86400) return `il y a ${Math.floor(diff / 3600)} h`;
+        if (diff < 2592000) return `il y a ${Math.floor(diff / 86400)} j`;
+        return `il y a ${Math.floor(diff / 2592000)} mois`;
+    }
+
+    function hasSqueeze(text) {
+        return /squeeze/i.test(text);
+    }
+
+    function renderPost(post) {
+        const url = `https://www.reddit.com${post.permalink}`;
+        const titleHasSqueeze = hasSqueeze(post.title);
+        const textHasSqueeze = hasSqueeze(post.selftext || '');
+        const squeezeBadge = (titleHasSqueeze || textHasSqueeze)
+            ? '<span class="squeeze-badge">SQUEEZE</span>' : '';
+
+        const excerpt = post.selftext && post.selftext.trim().length > 0
+            ? `<div class="post-excerpt">${post.selftext.trim()}</div>` : '';
+
+        const flair = post.link_flair_text
+            ? `<span class="post-flair">${post.link_flair_text}</span>` : '';
+
+        return `
+            <div class="post ${titleHasSqueeze || textHasSqueeze ? 'has-squeeze' : ''}">
+                <div class="post-meta">
+                    <span class="post-score">${post.score.toLocaleString()} pts</span>
+                    <span>${post.num_comments.toLocaleString()} commentaires</span>
+                    <span>u/${post.author}</span>
+                    <span>${relativeTime(post.created_utc)}</span>
+                    ${flair}
+                </div>
+                <div class="post-title">
+                    <a href="${url}" target="_blank">${post.title}</a>${squeezeBadge}
+                </div>
+                ${excerpt}
+            </div>
+        `;
+    }
+
+    async function fetchPosts() {
+        const statusEl = document.getElementById('status');
+        const postsEl = document.getElementById('posts');
+
+        if (!ticker) {
+            statusEl.textContent = 'Ticker manquant.';
+            statusEl.className = 'error';
+            return;
+        }
+
+        try {
+            const query = encodeURIComponent(ticker + ' squeeze');
+            const url = `https://www.reddit.com/r/wallstreetbets/search.json?q=${query}&sort=relevance&restrict_sr=on&t=year&limit=10`;
+
+            const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+            const json = await res.json();
+            const posts = json.data.children.map(c => c.data);
+
+            if (posts.length === 0) {
+                statusEl.textContent = `Aucun post trouvé pour "${ticker} squeeze" sur r/wallstreetbets.`;
+                return;
+            }
+
+            statusEl.textContent = `${posts.length} posts les plus pertinents pour "${ticker} squeeze" sur r/wallstreetbets`;
+            document.getElementById('header-sub').textContent = `${posts.length} résultats`;
+            postsEl.innerHTML = posts.map(renderPost).join('');
+
+        } catch (err) {
+            statusEl.textContent = `Erreur lors du chargement : ${err.message}`;
+            statusEl.className = 'error';
+        }
+    }
+
+    fetchPosts();
+</script>
+</body>
+</html>
