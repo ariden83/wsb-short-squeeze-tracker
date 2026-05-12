@@ -2,6 +2,10 @@
 
 Tracks stock tickers mentioned on [r/wallstreetbets](https://www.reddit.com/r/wallstreetbets/), ranked by most recent appearance. Each post's title is translated (EN→FR) and scored for sentiment (bullish / bearish / neutral) by a local NLP service — no external API calls.
 
+![web interface](./docs/images/web-local-interface.png)
+![detail page](./docs/images/web-local-interface-posts-details.png)
+![reddit link](./docs/images/reddit-link.png)
+
 ## How it works
 
 - A job runs every hour, but **only during NYSE trading hours** (Mon–Fri, 09:30–16:00 ET)
